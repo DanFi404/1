@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Карта погоды и маршрутов</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        h1, h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            color: #3498db;
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #2980b9;
+        }
+
+        #map {
+            height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+            border: 1px solid #ddd;
+        }
+
+        .route-controls {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .route-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e6f7ff;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin: 8px 5px 8px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #clear-route-button {
+            background-color: #e74c3c;
+        }
+
+        #clear-route-button:hover {
+            background-color: #c0392b;
+        }
+
+        #weather-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .forecast-day {
+            min-width: 150px;
+            padding: 15px;
+            text-align: center;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-right: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .forecast-day b {
+            color: #2c3e50;
+        }
+
+        .forecast-container {
+            display: flex;
+            overflow-x: auto;
+            padding: 10px 0;
+        }
+
+        .forecast-container::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .forecast-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .forecast-container::-webkit-scrollbar-thumb {
+            background: #bdc3c7;
+            border-radius: 10px;
+        }
+
+        .forecast-container::-webkit-scrollbar-thumb:hover {
+            background: #95a5a6;
+        }
+
+        .leaflet-popup-content {
+            min-width: 200px;
+        }
+
+        .leaflet-popup-content img {
+            display: block;
+            margin: 5px auto;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .route-controls {
+                padding: 15px;
+            }
+
+            button {
+                width: 100%;
+                margin: 8px 0;
+            }
+
+            .forecast-day {
+                min-width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Погода в мире и построение маршрутов</h1>
+
+        <div class="route-controls">
+            <h2>Поиск погоды</h2>
+            <input type="text" id="city-input" placeholder="Введите город">
+            <button id="search-button">Поиск</button>
+        </div>
+
+        <div class="route-controls">
+            <h2>Построение маршрута</h2>
+            <input type="text" id="start-point" placeholder="Начальная точка (город или адрес)">
+            <input type="text" id="end-point" placeholder="Конечная точка (город или адрес)">
+            <button id="route-button">Построить маршрут</button>
+            <button id="clear-route-button">Очистить маршрут</button>
+            <div id="route-info" class="route-info"></div>
+        </div>
+
+        <div id="map"></div>
+        <div id="weather-info"></div>
+    </div>
+
+    <script>
+        // Инициализация карты
+        var map = L.map('map').setView([20, 0], 2);
+        var routingControl = null;
+        var markers = [];
+
+        // Добавление слоя карты
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Функция для получения координат по названию города
+        function getCoordinates(city, callback) {
+            const apiKey = '5f4b95df009c58b0bc7ba7aa1eabc802'; // Замените на ваш API-ключ
+            const url = `https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`;
+
+            $.get(url, function(data) {
+                if (data && data.length > 0) {
+                    callback({
+                        lat: data[0].lat,
+                        lon: data[0].lon,
+                        name: data[0].name
+                    });
+                } else {
+                    alert('Город не найден!');
+                }
+            }).fail(function() {
+                alert('Ошибка при поиске города!');
+            });
+        }
+
+        // Функция для получения и отображения погоды
+        function getWeather(city) {
+            const apiKey = '5f4b95df009c58b0bc7ba7aa1eabc802'; // Замените на ваш API-ключ
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=ru`;
+
+            $.get(url, function(data) {
+                const lat = data.coord.lat;
+                const lon = data.coord.lon;
+                const temp = data.main.temp;
+                const humidity = data.main.humidity;
+                const windSpeed = data.wind.speed;
+                const windDeg = data.wind.deg;
+                const weatherDescription = data.weather[0].description;
+                const iconCode = data.weather[0].icon;
+                const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+
+                const windDirection = getWindDirection(windDeg);
+
+                // Обновление карты
+                map.setView([lat, lon], 10);
+
+                // Удаляем предыдущие маркеры
+                clearMarkers();
+
+                // Добавляем новый маркер
+                const marker = L.marker([lat, lon]).addTo(map)
+                    .bindPopup(`
+                        <b>${city}</b><br>
+                        <img src="${iconUrl}" alt="${weatherDescription}"><br>
+                        Температура: ${temp} °C<br>
+                        Погода: ${weatherDescription}<br>
+                        Влажность: ${humidity}%<br>
+                        Ветер: ${windSpeed} м/с, ${windDirection}
+                    `)
+                    .openPopup();
+
+                markers.push(marker);
+
+                // Получение прогноза на неделю
+                getWeeklyForecast(lat, lon);
+            }).fail(function() {
+                alert('Город не найден или произошла ошибка!');
+            });
+        }
+
+        // Функция для получения прогноза на неделю
+        function getWeeklyForecast(lat, lon) {
+            const apiKey = '5f4b95df009c58b0bc7ba7aa1eabc802'; // Замените на ваш API-ключ
+            const url = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=current,minutely,hourly,alerts&appid=${apiKey}&units=metric&lang=ru`;
+
+            $.get(url, function(data) {
+                let forecastHtml = '<h2>Прогноз на неделю</h2><div class="forecast-container">';
+                data.daily.slice(0, 7).forEach(day => {
+                    const date = new Date(day.dt * 1000).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+                    const tempDay = Math.round(day.temp.day);
+                    const tempNight = Math.round(day.temp.night);
+                    const iconCode = day.weather[0].icon;
+                    const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
+                    const description = day.weather[0].description;
+
+                    forecastHtml += `
+                        <div class="forecast-day">
+                            <div><b>${date}</b></div>
+                            <div><img src="${iconUrl}" alt="${description}"></div>
+                            <div>${description}</div>
+                            <div>Днём: ${tempDay} °C</div>
+                            <div>Ночью: ${tempNight} °C</div>
+                        </div>
+                    `;
+                });
+                forecastHtml += '</div>';
+                $('#weather-info').html(forecastHtml);
+            });
+        }
+
+        // Функция для построения маршрута
+        function buildRoute(startPoint, endPoint) {
+            // Очищаем предыдущий маршрут
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+
+            // Очищаем предыдущие маркеры
+            clearMarkers();
+
+            // Получаем координаты начальной точки
+            getCoordinates(startPoint, function(startCoords) {
+                // Добавляем маркер для начальной точки
+                const startMarker = L.marker([startCoords.lat, startCoords.lon]).addTo(map)
+                    .bindPopup(`<b>Начальная точка:</b><br>${startCoords.name}`)
+                    .openPopup();
+                markers.push(startMarker);
+
+                // Получаем координаты конечной точки
+                getCoordinates(endPoint, function(endCoords) {
+                    // Добавляем маркер для конечной точки
+                    const endMarker = L.marker([endCoords.lat, endCoords.lon]).addTo(map)
+                        .bindPopup(`<b>Конечная точка:</b><br>${endCoords.name}`)
+                        .openPopup();
+                    markers.push(endMarker);
+
+                    // Строим маршрут
+                    routingControl = L.Routing.control({
+                        waypoints: [
+                            L.latLng(startCoords.lat, startCoords.lon),
+                            L.latLng(endCoords.lat, endCoords.lon)
+                        ],
+                        routeWhileDragging: true,
+                        show: false, // Скрываем стандартную панель маршрута
+                        language: 'ru',
+                        formatter: new L.Routing.Formatter({
+                            language: 'ru',
+                            unit: 'metric'
+                        })
+                    }).addTo(map);
+
+                    // Подписываемся на событие изменения маршрута
+                    routingControl.on('routesfound', function(e) {
+                        const routes = e.routes;
+                        const route = routes[0];
+                        const distance = (route.summary.totalDistance / 1000).toFixed(1);
+                        const time = (route.summary.totalTime / 3600).toFixed(1);
+
+                        $('#route-info').html(`
+                            <b>Информация о маршруте:</b><br>
+                            Расстояние: ${distance} км<br>
+                            Примерное время: ${time} ч
+                        `);
+                    });
+
+                    // Центрируем карту на маршруте
+                    map.fitBounds([
+                        [startCoords.lat, startCoords.lon],
+                        [endCoords.lat, endCoords.lon]
+                    ]);
+                });
+            });
+        }
+
+        // Функция для очистки маршрута
+        function clearRoute() {
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+            clearMarkers();
+            $('#route-info').empty();
+        }
+
+        // Функция для очистки маркеров
+        function clearMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
+
+        // Преобразование градусов в сторону света
+        function getWindDirection(degrees) {
+            const directions = ['Северный', 'Северо-восточный', 'Восточный', 'Юго-восточный',
+                              'Южный', 'Юго-западный', 'Западный', 'Северо-западный'];
+            const index = Math.round((degrees % 360) / 45) % 8;
+            return directions[index];
+        }
+
+        // Обработчики событий
+        $('#search-button').on('click', function() {
+            const city = $('#city-input').val();
+            if (city) {
+                getWeather(city);
+            }
+        });
+
+        $('#route-button').on('click', function() {
+            const startPoint = $('#start-point').val();
+            const endPoint = $('#end-point').val();
+            if (startPoint && endPoint) {
+                buildRoute(startPoint, endPoint);
+            } else {
+                alert('Пожалуйста, введите начальную и конечную точки!');
+            }
+        });
+
+        $('#clear-route-button').on('click', function() {
+            clearRoute();
+        });
+
+        // Поиск по нажатию Enter
+        $('#city-input, #start-point, #end-point').keypress(function(e) {
+            if (e.which === 13) {
+                if ($(this).attr('id') === 'city-input') {
+                    $('#search-button').click();
+                } else {
+                    $('#route-button').click();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
